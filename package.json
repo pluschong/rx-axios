@@ -1,0 +1,21 @@
+{
+  "name": "@pluschong/rx-axios",
+  "version": "0.0.0",
+  "description": "基于axios和rxjs封装的http请求库",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "author": "pluschong",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pluschong/rx-axios.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pluschong/rx-axios/issues"
+  },
+  "homepage": "https://github.com/pluschong/rx-axios#readme",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  }
+}

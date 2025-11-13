@@ -1,0 +1,9 @@
+{
+	"extends": "../tsconfig.json",
+	"compilerOptions": {
+		"rootDir": ".",
+		"outDir": "../dist/rx-axios"
+	},
+	"files": ["index.ts"],
+	"include": ["./**/*.ts"]
+}
