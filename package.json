@@ -4,6 +4,15 @@
   "description": "基于axios和rxjs封装的http请求库",
   "main": "index.js",
   "types": "index.d.ts",
+  "keywords": [
+    "axios",
+    "rxjs",
+    "http",
+    "request",
+    "observable",
+    "reactive",
+    "http-client"
+  ],
   "author": "pluschong",
   "license": "MIT",
   "repository": {
