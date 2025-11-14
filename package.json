@@ -17,5 +17,17 @@
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"
+  },
+  "dependencies": {
+    "@pluschong/console-overlay": "^0.0.1",
+    "@pluschong/safe-type": "^0.0.1",
+    "@pluschong/utils": "^0.0.1",
+    "axios": "^1.13.2"
+  },
+  "peerDependencies": {
+    "rxjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "rxjs": "^7.8.2"
   }
 }
