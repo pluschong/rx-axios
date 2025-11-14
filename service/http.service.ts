@@ -1,12 +1,12 @@
 import { consoleSrv } from '@pluschong/console-overlay';
-import { SafeAny, SafeObject } from '@pluschong/safe-type';
+import type { SafeAny, SafeObject } from '@pluschong/safe-type';
 import { isHttpLink } from '@pluschong/utils';
+import { type AxiosResponse } from 'axios';
 import { map, Observable, tap } from 'rxjs';
 import httpClient from './http.client';
-import { HttpRequestConfig, HttpResponse, SetHandlers } from './http.type';
-import { _handlers } from './http.utils';
 import httpInterceptor from './http.interceptor';
-import { AxiosResponse } from 'axios';
+import type { HttpRequestConfig, HttpResponse, SetHandlers } from './http.type';
+import { _handlers } from './http.utils';
 
 class HttpService {
 	static instance: HttpService;
@@ -25,7 +25,9 @@ class HttpService {
 			observable: handler => (_handlers.observable = handler),
 			intercept: handler => (_handlers.intercept = handler),
 			error: handler => (_handlers.error = handler),
-			proxy: handler => (_handlers.proxy = handler)
+			proxy: handler => (_handlers.proxy = handler),
+			codeKeys: handler => (_handlers.codeKeys = handler),
+			successCode: handler => (_handlers.successCode = handler)
 		};
 	}
 
@@ -100,19 +102,21 @@ class HttpService {
 		switch (config.type) {
 			case 'post':
 				requestObs = httpClient.post(url, params, axiosRequestConfig);
+				break;
 			case 'get':
 				requestObs = httpClient.get(url, { ...axiosRequestConfig, params });
+				break;
 			case 'put':
 				requestObs = httpClient.put(url, params, axiosRequestConfig);
+				break;
 			case 'delete':
 				requestObs = httpClient.delete(url, { ...axiosRequestConfig, data: params });
+				break;
+			default:
+				throw new Error(`Unsupported request type: ${config.type}`);
 		}
 
-		if (requestObs) {
-			return httpInterceptor.use(requestObs, config);
-		} else {
-			throw new Error(`Unsupported request type: ${config.type}`);
-		}
+		return httpInterceptor.use(requestObs, config);
 	}
 
 	private printParams(tag: string, params: SafeAny, config: HttpRequestConfig, color = 'green') {
