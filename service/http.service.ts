@@ -74,25 +74,32 @@ class HttpService {
 	}
 
 	private request(config: HttpRequestConfig, params: SafeObject): Observable<HttpResponse> {
-		let domain = '';
-		let route = config.route;
-		const proxyCfg = new Map(Object.entries(_handlers.proxy()));
-		if (proxyCfg.size > 0) {
-			const cfg = Array.from(proxyCfg).filter(([prefix]) => config.route.startsWith(prefix))[0];
-			const pathRewrite = cfg ? cfg[1].pathRewrite : false;
-			domain = cfg ? cfg[1].target : '';
-
-			if (pathRewrite) {
-				route = route.replace(cfg[0], '');
-			}
+		// 如果是完整的 HTTP 链接，直接使用
+		if (isHttpLink(config.route)) {
+			return this.executeRequest(config.route, config, params);
 		}
 
-		const url = isHttpLink(config.route)
-			? config.route
-			: domain
-				? new URL(route, domain).href
-				: config.route;
+		// 处理代理配置
+		const proxyConfig = _handlers.proxy();
+		const proxyEntry = Object.entries(proxyConfig).find(([prefix]) =>
+			config.route.startsWith(prefix)
+		);
 
+		let url = config.route;
+		if (proxyEntry) {
+			const [prefix, { target, pathRewrite }] = proxyEntry;
+			const route = pathRewrite ? config.route.replace(prefix, '') : config.route;
+			url = new URL(route, target).href;
+		}
+
+		return this.executeRequest(url, config, params);
+	}
+
+	private executeRequest(
+		url: string,
+		config: HttpRequestConfig,
+		params: SafeObject
+	): Observable<HttpResponse> {
 		let requestObs: Observable<AxiosResponse>;
 		const axiosRequestConfig = {
 			timeout: config.timeout,
