@@ -1,11 +1,11 @@
 import type { SafeAny, SafeObject } from '@pluschong/safe-type';
-import type { RawAxiosRequestHeaders } from 'axios';
+import type { AxiosRequestHeaders } from 'axios';
 import type { Observable } from 'rxjs';
 
 export interface HttpResponse {
 	[key: string]: SafeAny;
 	errcode: number;
-  message?: string;
+	message?: string;
 }
 
 export interface HttpRequestConfig {
@@ -37,12 +37,14 @@ export interface ProxyConfig {
 }
 
 export type ConfigHandler = (config: HttpRequestConfig) => HttpRequestConfig;
-export type HeadersHandler = () => RawAxiosRequestHeaders;
+export type HeadersHandler = (headers: AxiosRequestHeaders) => AxiosRequestHeaders;
 export type ParamsHandler = () => SafeObject;
 export type ObservableHandler = (ob: Observable<HttpResponse>,config: HttpRequestConfig) => Observable<HttpResponse>; // prettier-ignore
 export type InterceptHandler = (config: HttpRequestConfig) => boolean;
 export type ErrorHandler = (event: SafeAny, config: HttpRequestConfig) => void;
 export type ProxyHandler = () => ProxyConfig;
+export type CodeKeysHandler = () => string[];
+export type SuccessCodeHandler = () => number[];
 
 export interface Handlers {
 	/** 处理请求配置 */
@@ -57,8 +59,12 @@ export interface Handlers {
 	intercept: InterceptHandler;
 	/** 处理请求错误 */
 	error: ErrorHandler;
-	/** 处理请求代理 */
+	/** 配置请求代理 */
 	proxy: ProxyHandler;
+	/** 配置错误码key */
+	codeKeys: CodeKeysHandler;
+	/** 配置成功错误码 */
+	successCode: SuccessCodeHandler;
 }
 export interface SetHandlers {
 	/** 设置处理请求配置函数 */
@@ -75,4 +81,8 @@ export interface SetHandlers {
 	error?: (fun: ErrorHandler) => void;
 	/** 设置处理请求代理函数 */
 	proxy?: (fun: ProxyHandler) => void;
+	/** 设置配置错误码key函数 */
+	codeKeys?: (fun: CodeKeysHandler) => void;
+	/** 设置配置成功错误码函数 */
+	successCode?: (fun: SuccessCodeHandler) => void;
 }

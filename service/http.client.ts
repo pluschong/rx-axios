@@ -1,9 +1,12 @@
 import { consoleSrv } from '@pluschong/console-overlay';
-import { SafeAny } from '@pluschong/safe-type';
-import axios, { Axios, CancelTokenSource } from 'axios';
+import type { SafeAny, SafeObject } from '@pluschong/safe-type';
+import axios, {
+	type Axios,
+	type AxiosRequestConfig,
+	type AxiosResponse,
+	type CancelTokenSource
+} from 'axios';
 import { Observable } from 'rxjs';
-import httpInterceptor from './http.interceptor';
-import { HttpOption, HttpOptions, HttpResponseBase } from './http.type';
 
 class HttpClient {
 	static instance: HttpClient;
@@ -12,69 +15,63 @@ class HttpClient {
 		return this.instance;
 	}
 
-	get(url: string, reqCfgOptions: HttpOption, options?: HttpOptions) {
-		return httpInterceptor.intercept(
-			this.makeObservable(axios.get, url, options),
-			reqCfgOptions
-		); // prettier-ignore
+	get(url: string, config?: AxiosRequestConfig) {
+		return this.makeObservable(axios.get, url, config);
 	}
 
-	post(url: string, data: SafeAny, reqCfgOptions: HttpOption, options?: HttpOptions) {
-		return httpInterceptor.intercept(
-			this.makeObservable(axios.post, url, data, options),
-			reqCfgOptions
-		);
+	delete(url: string, config?: AxiosRequestConfig) {
+		return this.makeObservable(axios.delete, url, config);
 	}
 
-	put(url: string, data: SafeAny, reqCfgOptions: HttpOption, options?: HttpOptions) {
-		return httpInterceptor.intercept(
-			this.makeObservable(axios.put, url, data, options),
-			reqCfgOptions
-		);
+	post(url: string, data: SafeObject, config?: AxiosRequestConfig) {
+		return this.makeObservable(axios.post, url, data, config);
 	}
 
-	delete(url: string, reqCfgOptions: HttpOption, options?: HttpOptions) {
-		return httpInterceptor.intercept(
-			this.makeObservable(axios.delete, url, options),
-			reqCfgOptions
-		);
+	put(url: string, data: SafeObject, config?: AxiosRequestConfig) {
+		return this.makeObservable(axios.put, url, data, config);
 	}
 
 	private makeObservable(
-		axiosMethod: Axios['get'] | Axios['post'] | Axios['put'] | Axios['delete'],
+		axiosMethod: Axios['get'] | Axios['delete'] | Axios['post'] | Axios['put'],
 		...args: SafeAny[]
-	): Observable<HttpResponseBase> {
+	): Observable<AxiosResponse> {
 		return new Observable(subscriber => {
-			const config = Object.assign({}, args[args.length - 1] || {});
-			let cancelSource: CancelTokenSource;
+			// 获取配置对象（最后一个参数）
+			const lastArg = args[args.length - 1];
+			const config: AxiosRequestConfig =
+				typeof lastArg === 'object' && lastArg !== null ? { ...lastArg } : {};
+
+			// 创建取消令牌
+			let cancelSource: CancelTokenSource | undefined;
 			if (!config.cancelToken) {
 				cancelSource = axios.CancelToken.source();
 				config.cancelToken = cancelSource.token;
 			}
 
 			try {
-				// @ts-ignore
+				// 执行 axios 请求
+				// @ts-expect-error - Dynamic axios method call with rest parameters
 				axiosMethod(...args)
-					.then(res => {
-						subscriber.next(res);
-					})
-					.catch(err => {
-						subscriber.error(err);
-					})
-					.finally(() => {
+					.then(response => {
+						subscriber.next(response);
 						subscriber.complete();
+					})
+					.catch(error => {
+						// 只在非取消错误时记录日志
+						if (!axios.isCancel(error)) {
+							consoleSrv.error('[http client error]', error);
+						}
+						subscriber.error(error);
 					});
 			} catch (error) {
 				consoleSrv.error('[http error] --> axiosMethod', error);
 				subscriber.error(error);
 			}
 
+			// 清理函数：取消请求
 			return () => {
-				if (config.responseType === 'stream') {
-					return;
-				}
-				if (cancelSource) {
-					cancelSource.cancel();
+				if (cancelSource && config.responseType !== 'stream') {
+					cancelSource.cancel('Request cancelled by Observable unsubscription');
 				}
 			};
 		});

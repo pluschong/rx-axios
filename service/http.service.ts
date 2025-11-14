@@ -3,8 +3,10 @@ import { SafeAny, SafeObject } from '@pluschong/safe-type';
 import { isHttpLink } from '@pluschong/utils';
 import { map, Observable, tap } from 'rxjs';
 import httpClient from './http.client';
+import { HttpRequestConfig, HttpResponse, SetHandlers } from './http.type';
+import { _handlers } from './http.utils';
 import httpInterceptor from './http.interceptor';
-import { Handlers, HttpRequestConfig, HttpResponse, SetHandlers } from './http.type';
+import { AxiosResponse } from 'axios';
 
 class HttpService {
 	static instance: HttpService;
@@ -13,44 +15,31 @@ class HttpService {
 		return this.instance;
 	}
 
-	private handlers: Handlers;
-
-	constructor() {
-		this.handlers = {
-			config: config => config,
-			headers: () => ({}),
-			params: () => ({}),
-			observable: (ob, config) => ob,
-			intercept: config => false,
-			error: (event, config) => {},
-			proxy: () => ({})
-		};
-		httpInterceptor.setHandlers(this.handlers);
-	}
+	constructor() {}
 
 	get setHandlers(): SetHandlers {
 		return {
-			config: handler => (this.handlers.config = handler),
-			headers: handler => (this.handlers.headers = handler),
-			params: handler => (this.handlers.params = handler),
-			observable: handler => (this.handlers.observable = handler),
-			intercept: handler => (this.handlers.intercept = handler),
-			error: handler => (this.handlers.error = handler),
-			proxy: handler => (this.handlers.proxy = handler)
+			config: handler => (_handlers.config = handler),
+			headers: handler => (_handlers.headers = handler),
+			params: handler => (_handlers.params = handler),
+			observable: handler => (_handlers.observable = handler),
+			intercept: handler => (_handlers.intercept = handler),
+			error: handler => (_handlers.error = handler),
+			proxy: handler => (_handlers.proxy = handler)
 		};
 	}
 
 	sendRequest(config: HttpRequestConfig, params: SafeObject = {}): Observable<HttpResponse> {
 		// 接口配置
-		const cfg = this.handlers.config(config);
+		const cfg = _handlers.config(config);
 		// 是否拦截，`true`继续走
-		const requestProceed = !this.handlers.intercept(cfg);
+		const requestProceed = !_handlers.intercept(cfg);
 		// 加入默认参数，组成新参数
-		const data = cfg.keepIntact ? params : { ...this.handlers.params(), ...params };
+		const data = cfg.keepIntact ? params : { ..._handlers.params(), ...params };
 
 		this.printParams(`[http request][${cfg.type}] --> `, data, cfg);
 
-		return this.handlers.observable(
+		return _handlers.observable(
 			requestProceed
 				? this.request(cfg, data).pipe(
 						tap({
@@ -85,7 +74,7 @@ class HttpService {
 	private request(config: HttpRequestConfig, params: SafeObject): Observable<HttpResponse> {
 		let domain = '';
 		let route = config.route;
-		const proxyCfg = new Map(Object.entries(this.handlers.proxy()));
+		const proxyCfg = new Map(Object.entries(_handlers.proxy()));
 		if (proxyCfg.size > 0) {
 			const cfg = Array.from(proxyCfg).filter(([prefix]) => config.route.startsWith(prefix))[0];
 			const pathRewrite = cfg ? cfg[1].pathRewrite : false;
@@ -102,17 +91,27 @@ class HttpService {
 				? new URL(route, domain).href
 				: config.route;
 
+		let requestObs: Observable<AxiosResponse>;
+		const axiosRequestConfig = {
+			timeout: config.timeout,
+			headers: config.headers
+		};
+
 		switch (config.type) {
 			case 'post':
-				return httpClient.post(url, params, config);
+				requestObs = httpClient.post(url, params, axiosRequestConfig);
 			case 'get':
-				return httpClient.get(url, params, config);
+				requestObs = httpClient.get(url, { ...axiosRequestConfig, params });
 			case 'put':
-				return httpClient.put(url, params, config);
+				requestObs = httpClient.put(url, params, axiosRequestConfig);
 			case 'delete':
-				return httpClient.delete(url, params, config);
-			default:
-				throw new Error(`Unsupported request type: ${config.type}`);
+				requestObs = httpClient.delete(url, { ...axiosRequestConfig, data: params });
+		}
+
+		if (requestObs) {
+			return httpInterceptor.use(requestObs, config);
+		} else {
+			throw new Error(`Unsupported request type: ${config.type}`);
 		}
 	}
 
