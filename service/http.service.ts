@@ -19,15 +19,42 @@ class HttpService {
 
 	get setHandlers(): SetHandlers {
 		return {
-			config: handler => (_handlers.config = handler),
-			headers: handler => (_handlers.headers = handler),
-			params: handler => (_handlers.params = handler),
-			observable: handler => (_handlers.observable = handler),
-			intercept: handler => (_handlers.intercept = handler),
-			error: handler => (_handlers.error = handler),
-			proxy: handler => (_handlers.proxy = handler),
-			codeKeys: handler => (_handlers.codeKeys = handler),
-			successCode: handler => (_handlers.successCode = handler)
+			config: handler => {
+				_handlers.config = handler;
+				return this.setHandlers;
+			},
+			headers: handler => {
+				_handlers.headers = handler;
+				return this.setHandlers;
+			},
+			params: handler => {
+				_handlers.params = handler;
+				return this.setHandlers;
+			},
+			observable: handler => {
+				_handlers.observable = handler;
+				return this.setHandlers;
+			},
+			intercept: handler => {
+				_handlers.intercept = handler;
+				return this.setHandlers;
+			},
+			error: handler => {
+				_handlers.error = handler;
+				return this.setHandlers;
+			},
+			proxy: handler => {
+				_handlers.proxy = handler;
+				return this.setHandlers;
+			},
+			codeKeys: handler => {
+				_handlers.codeKeys = handler;
+				return this.setHandlers;
+			},
+			successCode: handler => {
+				_handlers.successCode = handler;
+				return this.setHandlers;
+			}
 		};
 	}
 

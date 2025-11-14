@@ -68,21 +68,21 @@ export interface Handlers {
 }
 export interface SetHandlers {
 	/** 设置处理请求配置函数 */
-	config?: (fun: ConfigHandler) => void;
+	config?: (fun: ConfigHandler) => SetHandlers;
 	/** 设置处理请求头函数 */
-	headers?: (fun: HeadersHandler) => void;
+	headers?: (fun: HeadersHandler) => SetHandlers;
 	/** 设置处理请求参数函数 */
-	params?: (fun: ParamsHandler) => void;
+	params?: (fun: ParamsHandler) => SetHandlers;
 	/** 设置处理请求可观察对象函数 */
-	observable?: (fun: ObservableHandler) => void;
+	observable?: (fun: ObservableHandler) => SetHandlers;
 	/** 设置处理请求拦截函数 */
-	intercept?: (fun: InterceptHandler) => void;
+	intercept?: (fun: InterceptHandler) => SetHandlers;
 	/** 设置处理请求错误函数 */
-	error?: (fun: ErrorHandler) => void;
+	error?: (fun: ErrorHandler) => SetHandlers;
 	/** 设置处理请求代理函数 */
-	proxy?: (fun: ProxyHandler) => void;
+	proxy?: (fun: ProxyHandler) => SetHandlers;
 	/** 设置配置错误码key函数 */
-	codeKeys?: (fun: CodeKeysHandler) => void;
+	codeKeys?: (fun: CodeKeysHandler) => SetHandlers;
 	/** 设置配置成功错误码函数 */
-	successCode?: (fun: SuccessCodeHandler) => void;
+	successCode?: (fun: SuccessCodeHandler) => SetHandlers;
 }
