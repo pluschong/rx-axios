@@ -1,22 +1,14 @@
 import type { SafeAny, SafeObject } from '@pluschong/safe-type';
-import type { AxiosRequestConfig, AxiosRequestHeaders, AxiosResponse } from 'axios';
+import type { RawAxiosRequestHeaders } from 'axios';
 import type { Observable } from 'rxjs';
 
-export type HttpResponseBase = AxiosResponse;
-
-export type HttpOptions = AxiosRequestConfig;
-
-/** Response */
-export interface HttpRes {
+export interface HttpResponse {
 	[key: string]: SafeAny;
-	success: boolean;
-	errcode: SafeAny;
-	message: SafeAny;
+	errcode: number;
+  message?: string;
 }
 
-export type HttpParams = SafeAny;
-
-export interface HttpOption {
+export interface HttpRequestConfig {
 	/** 请求路由 */
 	route: string;
 	/** request method */
@@ -26,7 +18,7 @@ export interface HttpOption {
 	/** 超时时间 毫秒 */
 	timeout?: number;
 	/** 重试次数 */
-	retry?: number;
+	retryCount?: number;
 	/** 静默模式：不打印请求和响应日志 */
 	silent?: boolean;
 	/** 禁用错误提示 */
@@ -37,13 +29,6 @@ export interface HttpOption {
 	keepIntact?: boolean;
 }
 
-export type ReqParam = SafeAny;
-
-export interface RspParam {
-	[key: string]: SafeAny;
-	data?: SafeAny;
-}
-
 export interface ProxyConfig {
 	[prefix: string]: {
 		target: string;
@@ -51,27 +36,43 @@ export interface ProxyConfig {
 	};
 }
 
-export type UseProxyCfg = () => ProxyConfig;
-export type UseReqHeaders = (config: AxiosRequestConfig<SafeAny>) => AxiosRequestHeaders;
-export type UseReqDefOption = (op: HttpOption) => HttpOption;
-export type UseReqDefParam = (op: HttpOption) => SafeObject;
-export type UseRspErrMsg = (value: RspParam, op: HttpOption) => void;
-export type UseIntercept = (op: HttpOption, ob: Observable<RspParam>) => Observable<RspParam>;
-export type UseSendBefore = (op: HttpOption) => boolean;
+export type ConfigHandler = (config: HttpRequestConfig) => HttpRequestConfig;
+export type HeadersHandler = () => RawAxiosRequestHeaders;
+export type ParamsHandler = () => SafeObject;
+export type ObservableHandler = (ob: Observable<HttpResponse>,config: HttpRequestConfig) => Observable<HttpResponse>; // prettier-ignore
+export type InterceptHandler = (config: HttpRequestConfig) => boolean;
+export type ErrorHandler = (event: SafeAny, config: HttpRequestConfig) => void;
+export type ProxyHandler = () => ProxyConfig;
 
-export interface Interceptors {
-	/** 请求代理 */
-	proxy: (fun: UseProxyCfg) => void;
-	/** 头代理 */
-	headers: (fun: UseReqHeaders) => void;
-	/** 默认配置 */
-	options: (fun: UseReqDefOption) => void;
-	/** 默认参数 */
-	request: (fun: UseReqDefParam) => void;
-	/** 错误代理 */
-	response: (fun: UseRspErrMsg) => void;
-	/** 拦截 */
-	intercept: (fun: UseIntercept) => void;
-	/** 发送请求之前 */
-	sendBefore: (fun: UseSendBefore) => void;
+export interface Handlers {
+	/** 处理请求配置 */
+	config: ConfigHandler;
+	/** 处理请求头 */
+	headers: HeadersHandler;
+	/** 处理请求参数 */
+	params: ParamsHandler;
+	/** 处理请求可观察对象 */
+	observable: ObservableHandler;
+	/** 处理请求拦截 */
+	intercept: InterceptHandler;
+	/** 处理请求错误 */
+	error: ErrorHandler;
+	/** 处理请求代理 */
+	proxy: ProxyHandler;
+}
+export interface SetHandlers {
+	/** 设置处理请求配置函数 */
+	config?: (fun: ConfigHandler) => void;
+	/** 设置处理请求头函数 */
+	headers?: (fun: HeadersHandler) => void;
+	/** 设置处理请求参数函数 */
+	params?: (fun: ParamsHandler) => void;
+	/** 设置处理请求可观察对象函数 */
+	observable?: (fun: ObservableHandler) => void;
+	/** 设置处理请求拦截函数 */
+	intercept?: (fun: InterceptHandler) => void;
+	/** 设置处理请求错误函数 */
+	error?: (fun: ErrorHandler) => void;
+	/** 设置处理请求代理函数 */
+	proxy?: (fun: ProxyHandler) => void;
 }

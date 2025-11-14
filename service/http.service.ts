@@ -1,136 +1,93 @@
-import { loggerSrv } from '@yasf/logger';
-import { SafeAny, SafeArray } from '@yasf/types';
-import { isHttpLink } from '@yasf/utils';
+import { consoleSrv } from '@pluschong/console-overlay';
+import { SafeAny, SafeObject } from '@pluschong/safe-type';
+import { isHttpLink } from '@pluschong/utils';
 import { map, Observable, tap } from 'rxjs';
-import _http from './http.client';
+import httpClient from './http.client';
 import httpInterceptor from './http.interceptor';
-import {
-	HttpOption,
-	HttpParams,
-	HttpRes,
-	Interceptors,
-	ReqParam,
-	RspParam,
-	UseIntercept,
-	UseProxyCfg,
-	UseReqDefOption,
-	UseReqDefParam,
-	UseReqHeaders,
-	UseRspErrMsg,
-	UseSendBefore
-} from './http.type';
+import { Handlers, HttpRequestConfig, HttpResponse, SetHandlers } from './http.type';
 
 class HttpService {
 	static instance: HttpService;
 	static getInstance() {
-		if (!this.instance) {
-			this.instance = new HttpService();
-		}
+		if (!this.instance) this.instance = new HttpService();
 		return this.instance;
 	}
 
-	private interceptorsFuns: {
-		proxy: UseProxyCfg;
-		headers: UseReqHeaders;
-		options: UseReqDefOption;
-		request: UseReqDefParam;
-		response: UseRspErrMsg;
-		intercept: UseIntercept;
-		sendBefore: UseSendBefore;
-	};
+	private handlers: Handlers;
 
 	constructor() {
-		this.interceptorsFuns = {
-			proxy: () => ({}),
+		this.handlers = {
+			config: config => config,
 			headers: () => ({}),
-			options: op => op,
-			request: op => ({}),
-			response: () => {},
-			intercept: (op, ob) => ob,
-			sendBefore: () => true
+			params: () => ({}),
+			observable: (ob, config) => ob,
+			intercept: config => false,
+			error: (event, config) => {},
+			proxy: () => ({})
 		};
-		httpInterceptor.setInterceptorFuns(this.interceptorsFuns);
+		httpInterceptor.setHandlers(this.handlers);
 	}
 
-	get interceptors(): Interceptors {
+	get setHandlers(): SetHandlers {
 		return {
-			proxy: fun => {
-				this.interceptorsFuns.proxy = fun;
-			},
-			headers: fun => {
-				this.interceptorsFuns.headers = fun;
-			},
-			options: fun => {
-				this.interceptorsFuns.options = fun;
-			},
-			request: fun => {
-				this.interceptorsFuns.request = fun;
-			},
-			response: fun => {
-				this.interceptorsFuns.response = fun;
-			},
-			intercept: fun => {
-				this.interceptorsFuns.intercept = fun;
-			},
-			sendBefore: fun => {
-				this.interceptorsFuns.sendBefore = fun;
-			}
+			config: handler => (this.handlers.config = handler),
+			headers: handler => (this.handlers.headers = handler),
+			params: handler => (this.handlers.params = handler),
+			observable: handler => (this.handlers.observable = handler),
+			intercept: handler => (this.handlers.intercept = handler),
+			error: handler => (this.handlers.error = handler),
+			proxy: handler => (this.handlers.proxy = handler)
 		};
 	}
 
-	sendRequest(option: HttpOption, data: HttpParams = {}): Observable<RspParam> {
+	sendRequest(config: HttpRequestConfig, params: SafeObject = {}): Observable<HttpResponse> {
 		// 接口配置
-		const options = this.interceptorsFuns.options(option);
-		// 是否拦截，`true`正常走
-		const isNext = this.interceptorsFuns.sendBefore(options);
-		// 默认携带的参数
-		const defaultData = {
-			...this.interceptorsFuns.request(options)
-		};
-		// 组成新参数
-		const params = options.keepIntact ? data : { ...defaultData, ...data };
+		const cfg = this.handlers.config(config);
+		// 是否拦截，`true`继续走
+		const requestProceed = !this.handlers.intercept(cfg);
+		// 加入默认参数，组成新参数
+		const data = cfg.keepIntact ? params : { ...this.handlers.params(), ...params };
 
-		this.printParams(`[http req][${options.type}] --> `, params, options);
+		this.printParams(`[http request][${cfg.type}] --> `, data, cfg);
 
-		return this.interceptorsFuns.intercept(
-			options,
-			isNext
-				? this.request(options, params).pipe(
+		return this.handlers.observable(
+			requestProceed
+				? this.request(cfg, data).pipe(
 						tap({
 							next: event => {
-								this.printParams(`[http rsp][${options.type}] --> `, event, options);
+								this.printParams(`[http response][${cfg.type}] --> `, event, cfg);
 							},
 							error: err => {
-								this.printParams(`[http rsp][${options.type}] --> `, err, options, 'red');
+								this.printParams(`[http response][${cfg.type}] --> `, err, cfg, 'red');
 							}
 						}),
 						map(res => {
-							return typeof res === 'string' ? { data: res } : { ...res };
+							// 可在此处处理返回值
+							return res;
 						})
 					)
-				: new Observable<RspParam>(subscriber => {
+				: new Observable<HttpResponse>(subscriber => {
 						subscriber.error({
-							err_code: 11001,
-							err_msg: '请求被拦截，不发送请求'
+							errcode: 11001,
+							message: '请求被拦截，不发送请求'
 						});
 					}).pipe(
 						tap({
 							error: err => {
-								this.printParams(`[http rsp][${options.type}] --> `, err, options, 'red');
+								this.printParams(`[http response][${cfg.type}] --> `, err, cfg, 'red');
 							}
 						})
-					)
+					),
+			cfg
 		);
 	}
 
-	private request(options: HttpOption, params: SafeAny): Observable<HttpRes> {
+	private request(config: HttpRequestConfig, params: SafeObject): Observable<HttpResponse> {
 		let domain = '';
-		let route = options.route;
-		const proxyCfg = new Map(Object.entries(this.interceptorsFuns.proxy()));
+		let route = config.route;
+		const proxyCfg = new Map(Object.entries(this.handlers.proxy()));
 		if (proxyCfg.size > 0) {
-			const cfg = Array.from(proxyCfg).filter(([prefix, cfg]) =>
-				options.route.startsWith(prefix)
-			)[0];
+			const cfg = Array.from(proxyCfg).filter(([prefix]) => config.route.startsWith(prefix))[0];
 			const pathRewrite = cfg ? cfg[1].pathRewrite : false;
 			domain = cfg ? cfg[1].target : '';
 
@@ -139,58 +96,28 @@ class HttpService {
 			}
 		}
 
-		const url = isHttpLink(options.route)
-			? options.route
+		const url = isHttpLink(config.route)
+			? config.route
 			: domain
 				? new URL(route, domain).href
-				: options.route;
+				: config.route;
 
-		switch (options.type) {
+		switch (config.type) {
 			case 'post':
-				return this.post(url, params, options);
+				return httpClient.post(url, params, config);
 			case 'get':
-				return this.get(url, params, options);
+				return httpClient.get(url, params, config);
 			case 'put':
-				return this.put(url, params, options);
+				return httpClient.put(url, params, config);
 			case 'delete':
-				return this.delete(url, params, options);
+				return httpClient.delete(url, params, config);
+			default:
+				throw new Error(`Unsupported request type: ${config.type}`);
 		}
 	}
 
-	private post(url: string, data: ReqParam, reqCfgOptions: HttpOption) {
-		return _http.post(url, data, reqCfgOptions, {
-			timeout: reqCfgOptions.timeout,
-			headers: reqCfgOptions.headers
-		});
-	}
-
-	private put(url: string, data: ReqParam, reqCfgOptions: HttpOption) {
-		return _http.put(url, data, reqCfgOptions, {
-			timeout: reqCfgOptions.timeout,
-			headers: reqCfgOptions.headers
-		});
-	}
-
-	private delete(url: string, data: ReqParam, reqCfgOptions: HttpOption) {
-		return _http.delete(url, reqCfgOptions, {
-			data,
-			timeout: reqCfgOptions.timeout,
-			headers: reqCfgOptions.headers
-		});
-	}
-
-	private get(url: string, params: ReqParam, reqCfgOptions: HttpOption) {
-		return _http.get(url, reqCfgOptions, {
-			params,
-			timeout: reqCfgOptions.timeout,
-			headers: reqCfgOptions.headers
-		});
-	}
-
-	private printParams(tag: string, params: SafeAny, options: HttpOption, color = 'green') {
-		if (!options.isConsoleInvisible) {
-			loggerSrv.log(`${tag}${options.route}`, params, color);
-		}
+	private printParams(tag: string, params: SafeAny, config: HttpRequestConfig, color = 'green') {
+		if (!config.silent) consoleSrv.info(`${tag}${config.route}`, params, color);
 	}
 }
 
