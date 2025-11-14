@@ -68,8 +68,8 @@ class HttpInterceptor {
 				}
 			}
 			return code === -1 || _handlers.successCode().includes(code)
-				? of(event.data)
-				: throwError(() => event.data);
+				? of({ ...event.data, errcode: code }) // 把错误码统一在这里转成errcode，暴露给下层catchError
+				: throwError(() => ({ ...event.data, errcode: code }));
 		}
 
 		return throwError(() => event);
